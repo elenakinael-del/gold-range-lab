@@ -1,0 +1,181 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gold Range Lab — inside the range</title>
+<style>
+:root{--void:#02030a;--w:#fff;--dim:rgba(255,255,255,.62);--line:rgba(255,255,255,.12)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(120% 90% at 50% 0%,#070a1c 0%,var(--void) 60%);color:var(--w);font-family:"Times New Roman",Times,"Liberation Serif",serif;min-height:100vh;padding:26px 34px 40px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:18px}
+h1{font-weight:400;font-size:34px;letter-spacing:.5px}h1 i{color:var(--dim);font-size:18px;margin-left:12px}
+.price{font-size:46px;line-height:1}.chg{font-size:18px;margin-left:10px;color:var(--dim)}
+.meta{font-size:14px;color:var(--dim);font-style:italic;text-align:right}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:3px;margin-left:10px}.seg button{background:none;border:0;color:var(--dim);font:inherit;font-size:14px;padding:3px 10px;cursor:pointer}.seg button.on{color:#fff;background:rgba(255,255,255,.1)}
+.card{border:1px solid var(--line);border-radius:4px;background:rgba(6,8,20,.55);position:relative;overflow:hidden}
+.card h2{font-weight:400;font-size:19px;padding:12px 16px 0}.card p.sub{font-size:13px;font-style:italic;color:var(--dim);padding:0 16px}
+.card canvas{display:block;width:100%}.ro{padding:6px 16px 14px;font-size:14.5px;line-height:1.5;min-height:62px}
+#chart{height:300px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.grid canvas{height:290px}.banner{display:none;margin-bottom:12px;padding:6px 12px;border:1px solid rgba(255,255,255,.25);font-style:italic;font-size:14px}
+.verdict{font-size:40px;padding:6px 16px 0;letter-spacing:2px}.tbl{padding:8px 16px 14px;display:grid;grid-template-columns:1fr auto;gap:3px 12px;font-size:15px}.tbl span:nth-child(even){text-align:right}
+.insight{border-top:1px solid var(--line);margin:8px 16px 16px;padding-top:12px;line-height:1.5}.insight h3{font-size:17px;font-weight:400}.insight-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.side-badge{border:1px solid var(--line);padding:2px 8px;font-size:12px;letter-spacing:.5px;white-space:nowrap}.insight p,.insight li{font-size:14px;color:var(--dim)}.insight ul{padding-left:19px;margin:6px 0}.insight .caveat{font-size:12px;font-style:italic}
+.spark{height:70px!important}.foot{margin-top:18px;font-size:12.5px;color:var(--dim);font-style:italic}
+@media(max-width:1100px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><div><h1>Gold Range Lab<i>what is happening inside the range</i></h1>
+<div style="margin-top:10px"><span class="price" id="px">—</span><span class="chg" id="chg"></span></div></div>
+<div class="meta"><div><span id="src">connecting…</span></div><div>updated <span id="upd">—</span> · <span id="cnt"></span>
+<span class="seg" id="seg"></span></div></div></header>
+<div class="banner" id="ban"></div>
+<div class="card"><h2>Structural range · live candles</h2><p class="sub" id="rngline"></p><canvas id="chart"></canvas></div>
+<div class="grid" id="grid"></div>
+<p class="foot">Descriptive analytics on public delayed Yahoo Finance data (GC=F). Physics models are visual analogies calibrated on the live series — not trading signals or financial advice.</p>
+<script>
+const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),sm=(x,a,b)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+const ramp=s=>v=>{v=clamp(v,0,1);for(let i=1;i<s.length;i++)if(v<=s[i][0]){const a=s[i-1],b=s[i],t=(v-a[0])/(b[0]-a[0]);return a[1].map((c,k)=>255*(c+(b[1][k]-c)*t))}return s[s.length-1][1].map(c=>c*255)};
+const HEAT=ramp([[0,[.02,0,.1]],[.2,[.22,.03,.55]],[.42,[.75,.08,.45]],[.62,[1,.38,.08]],[.82,[1,.78,.3]],[1,[1,.97,.88]]]);
+const ICE=ramp([[0,[0,.02,.12]],[.3,[.05,.25,.75]],[.6,[.1,.7,1]],[.85,[.6,.95,1]],[1,[1,1,1]]]);
+const GOLD=ramp([[0,[.1,.03,0]],[.4,[.7,.35,.05]],[.7,[1,.75,.25]],[1,[1,.97,.8]]]);
+const mix=(a,b,t)=>a.map((x,i)=>x+(b[i]-x)*t);
+let L=null; // live metrics (eased copy in S)
+const S={pos:.5,cvd:0,comp:0,vr:1,pe:.5,H:.5,press:0,pk:1,bias:1,kU:3,kD:3};
+const sprites={};function sprite(c){const k=(c[0]>>4)+','+(c[1]>>4)+','+(c[2]>>4);if(sprites[k])return sprites[k];
+ const s=document.createElement('canvas');s.width=s.height=48;const g=s.getContext('2d'),r=g.createRadialGradient(24,24,0,24,24,24);
+ const R=(c[0]>>4)*17,G=(c[1]>>4)*17,B=(c[2]>>4)*17;r.addColorStop(0,`rgba(${R},${G},${B},1)`);r.addColorStop(.25,`rgba(${R},${G},${B},.45)`);r.addColorStop(1,`rgba(${R},${G},${B},0)`);
+ g.fillStyle=r;g.fillRect(0,0,48,48);return sprites[k]=s}
+class View{constructor(c){this.c=c;this.x=c.getContext('2d');this.cam={az:0,el:.5,dist:9,fov:40,t:[0,0,0]};this.fit()}
+ fit(){const d=devicePixelRatio||1,r=this.c.getBoundingClientRect();this.c.width=r.width*d;this.c.height=r.height*d;this.W=this.c.width;this.H=this.c.height;this.d=d}
+ P(x,y,z){const c=this.cam,X=x-c.t[0],Y=y-c.t[1],Z=z-c.t[2],ca=Math.cos(c.az),sa=Math.sin(c.az),ce=Math.cos(c.el),se=Math.sin(c.el);
+  const x1=ca*X+sa*Y,y1=-sa*X+ca*Y,y2=ce*y1-se*Z,z2=ce*Z+se*y1,dep=Math.max(.3,y2+c.dist),f=this.H*.5/Math.tan(c.fov*Math.PI/360);return[this.W/2+f*x1/dep,this.H/2-f*z2/dep,dep]}
+ begin(fade){const x=this.x;x.globalCompositeOperation='source-over';x.fillStyle=`rgba(2,3,10,${fade})`;x.fillRect(0,0,this.W,this.H);x.globalCompositeOperation='lighter'}
+ dot(p,c,size,a=1){const q=this.P(p[0],p[1],p[2]),s=size*this.d*clamp(this.cam.dist/q[2],.3,2.5);if(q[0]<-20||q[0]>this.W+20)return;this.x.globalAlpha=clamp(a,0,1);this.x.drawImage(sprite(c),q[0]-s,q[1]-s,2*s,2*s)}
+ line(pts,c,a,lw=1){const x=this.x;x.globalAlpha=clamp(a,0,1);x.strokeStyle=`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;x.lineWidth=lw*this.d;x.beginPath();pts.forEach((p,i)=>{const q=this.P(p[0],p[1],p[2]);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.stroke()}
+ label(p,t,a=.9){const q=this.P(p[0],p[1],p[2]),x=this.x;x.globalCompositeOperation='source-over';x.globalAlpha=a;x.fillStyle='#fff';x.font=`${13*this.d}px "Times New Roman",Times,serif`;x.textAlign='center';x.fillText(t,q[0],q[1]);x.globalCompositeOperation='lighter'}}
+const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(TAU*v)};
+const fmt=(x,n=2)=>x==null?'—':x.toLocaleString(undefined,{minimumFractionDigits:n,maximumFractionDigits:n});
+
+/* ---------- 1. potential well ---------- */
+function Well(v){const N=700,p=Array.from({length:N},()=>[gauss()*.25,gauss()*.25]);let hero=0,t=0;const xs=[],ys=[];for(let i=0;i<34;i++)xs.push(-1.9+4.4*i/33);for(let j=0;j<20;j++)ys.push(-1.5+3*j/19);
+ const U=(x,y,tau,V0,rip)=>{const r2=x*x+y*y;return -V0*Math.exp(-r2/.605)-tau*x+.17*y*y+.1*rip(x)*Math.exp(-r2/1.02)};
+ const vz=u=>1.5*(u<0?-1.6*Math.log1p(-u/1.6):u);
+ return{info:()=>`Kramers index ↑ ${fmt(S.kU)}  ↓ ${fmt(S.kD)}<br>tilt τ = ${fmt(clamp(S.cvd*4,-1.6,1.6))} · depth V₀ = ${fmt(1.25*(.6+.8*S.comp))} · price at ${fmt(100*S.pos,0)}% of range`,
+ step(dt){t+=dt;v.cam.az=-.65+.35*Math.sin(t/9);v.cam.el=.55;v.cam.dist=12;v.cam.t=[1.0,0,-.9];
+  const tau=clamp(S.cvd*4,-1.6,1.6),V0=1.25*(.6+.8*S.comp),D=.12+.1*clamp(S.vr,.5,1.5),h=1e-3,prof=L?L.profile_u:[0],m=prof.length,mean=prof.reduce((a,b)=>a+b,0)/m,
+  rip=x=>{const f=(x+1)/2*(m-1);if(f<0||f>m-1)return 0;const i=Math.floor(f);return prof[i]*(1-(f-i))+prof[Math.min(m-1,i+1)]*(f-i)-mean};
+  for(let k=0;k<4;k++)for(const q of p){const gx=(U(q[0]+h,q[1],tau,V0,rip)-U(q[0]-h,q[1],tau,V0,rip))/(2*h),gy=(U(q[0],q[1]+h,tau,V0,rip)-U(q[0],q[1]-h,tau,V0,rip))/(2*h);
+   q[0]+=-gx*.012+Math.sqrt(2*D*.012)*gauss();q[1]+=-gy*.012+Math.sqrt(2*D*.012)*gauss();if(Math.abs(q[0])>3||Math.abs(q[1])>3){q[0]=gauss()*.2;q[1]=gauss()*.2}}
+  hero+=((2*S.pos-1)-hero)*.05;this.cur={tau,V0,rip}},
+ draw(){const{tau,V0,rip}=this.cur;v.begin(.2);const S_=1.7;
+  for(let j=0;j<ys.length;j++){const pts=xs.map(x=>[x*S_,ys[j]*S_,vz(U(x,ys[j],tau,V0,rip))]);v.line(pts,HEAT(.3+.3*(j%2)),.3)}
+  for(let i=0;i<xs.length;i++){const pts=ys.map(y=>[xs[i]*S_,y*S_,vz(U(xs[i],y,tau,V0,rip))]);v.line(pts,HEAT(.35),.25)}
+  for(const q of p){const esc=clamp((q[0]-1)/1.5,0,1),c=mix(ICE(.7),GOLD(.9),Math.abs(esc));v.dot([q[0]*S_,q[1]*S_,vz(U(q[0],q[1],tau,V0,rip))+.06],c,3.2,.7)}
+  const hz=vz(U(hero,0,tau,V0,rip));v.dot([hero*S_,0,hz+.1],GOLD(1),12,1);v.label([hero*S_,0,hz+.8],'live price',.9);
+  v.label([-S_,-3.3,-1.8],'RANGE LOW',.75);v.label([S_,-3.3,-1.8],'RANGE HIGH',.75)}}}
+
+/* ---------- 2. entropy / lattice ---------- */
+function Lattice(v){const n=9,site=[];for(let i=0;i<n;i++)for(let j=0;j<n;j++)for(let k=0;k<8;k++)site.push([-1+2*i/(n-1),-1+2*j/(n-1),-1+2*k/7]);const N=site.length,x=site.map(()=>[Math.random()*2-1,Math.random()*2-1,Math.random()*2-1]),vel=site.map(()=>[0,0,0]);let t=0,phi=0,T=1;
+ return{info:()=>`permutation entropy ${fmt(S.pe,3)} (pct ${fmt(100*S.pctE,0)})<br>order φ = ${fmt(phi)} · T = ${fmt(T)} · vol ratio ${fmt(S.vr)}`,
+ step(dt){t+=dt;v.cam.az=-.5+t*.07;v.cam.el=.38;v.cam.dist=9.5;v.cam.t=[0,0,0];
+  T=.06+.94*S.pctE;const melt=sm(S.vr,1.15,1.7),kk=(55*Math.pow(1-sm(T,.08,.7),1.3)+.4)*(1-melt*.9);let ph=0;
+  for(let it=0;it<2;it++)for(let i=0;i<N;i++){for(let d=0;d<3;d++){const a=-kk*(x[i][d]-site[i][d])-2.2*vel[i][d];vel[i][d]+=a*.02+Math.sqrt(2*2.2*T*.02)*gauss();x[i][d]+=vel[i][d]*.02;
+    if(melt<.05&&Math.abs(x[i][d])>1.05){x[i][d]=clamp(x[i][d],-1.05,1.05);vel[i][d]*=-.5}}}
+  for(let i=0;i<N;i++){const dx=x[i][0]-site[i][0],dy=x[i][1]-site[i][1],dz=x[i][2]-site[i][2];ph+=Math.exp(-(dx*dx+dy*dy+dz*dz)/.01)}phi=ph/N},
+ draw(){v.begin(.22);for(let i=0;i<N;i++){const ke=clamp((vel[i][0]**2+vel[i][1]**2+vel[i][2]**2)/3.2,0,1),c=mix(ICE(.38+.38*(1-ke)**2),HEAT(.45+.55*ke),ke);v.dot([x[i][0]*1.4,x[i][1]*1.4,x[i][2]*1.4],c,3,.85)}
+  const C=[-1.45,1.45];for(const a of C)for(const b of C){v.line([[a,b,-1.45],[a,b,1.45]],[90,140,255],.25);v.line([[a,-1.45,b],[a,1.45,b]],[90,140,255],.25);v.line([[-1.45,a,b],[1.45,a,b]],[90,140,255],.25)}}}}
+
+/* ---------- 3. diffusion with walls ---------- */
+function Diffusion(v){const nx=76,ny=22,X=i=>-3.1+6.2*i/(nx-1),Y=j=>-1.4+2.8*j/(ny-1),dx=6.2/(nx-1),dy=2.8/(ny-1);let u=Array.from({length:nx},()=>new Float32Array(ny)),t=0,stress=0,pU=.03,pD=.03;
+ return{info:()=>`wall stress |Δu| = ${fmt(stress)}<br>permeability ↑ ${fmt(pU)} ↓ ${fmt(pD)} · D = ${fmt(.03)}`,
+ step(dt){t+=dt;v.cam.az=-.9+.3*Math.sin(t/11);v.cam.el=.5;v.cam.dist=13;v.cam.t=[0,0,.3];
+  pU=.03+.97*sm(S.pos,.78,1);pD=.03+.97*(1-sm(S.pos,0,.22));const D=.03,d=.05,nu=u.map(r=>r.slice()),src=2*S.pos-1;
+  for(let i=0;i<nx;i++){const xf=X(i),pw=(a,b)=>{const xm=(a+b)/2;return Math.abs(xm+1)<.07?pD:Math.abs(xm-1)<.07?pU:1};
+   for(let j=0;j<ny;j++){const l=i>0?pw(X(i-1),xf)*(u[i-1][j]-u[i][j]):0,r=i<nx-1?pw(xf,X(i+1))*(u[i+1][j]-u[i][j]):0,dn=j>0?u[i][j-1]-u[i][j]:0,up=j<ny-1?u[i][j+1]-u[i][j]:0;
+    nu[i][j]=u[i][j]+d*D*((l+r)/(dx*dx)+(dn+up)/(dy*dy))+.14*Math.exp(-((xf-src)**2/.06+Y(j)**2/.3))*dt*6-(Math.abs(xf)>2.7?.04*u[i][j]:0)}}
+  u=nu;const iH=Math.round((1+3.1)/6.2*(nx-1)),iL=Math.round((-1+3.1)/6.2*(nx-1));stress=Math.max(Math.abs(u[iH-2][ny>>1]-u[iH+2][ny>>1]),Math.abs(u[iL-2][ny>>1]-u[iL+2][ny>>1]))*2},
+ draw(){v.begin(.3);const Z=(i,j)=>2.6*Math.pow(Math.max(u[i][j],0),.6);
+  for(let j=0;j<ny;j++){const p=[];for(let i=0;i<nx;i++)p.push([X(i),Y(j),Z(i,j)]);v.line(p,HEAT(.3+.1*(j%2)),.35)}
+  for(let i=0;i<nx;i+=1){const p=[];for(let j=0;j<ny;j++)p.push([X(i),Y(j),Z(i,j)]);v.line(p,HEAT(.2+.6*clamp(Z(i,ny>>1)/2.2,0,1)),.28)}
+  for(const [xe,pm] of [[-1,pD],[1,pU]]){const a=(1-pm)*(.4+clamp(stress*3,0,1)*.6);for(let k=0;k<7;k++){const y=-1.4+2.8*k/6;v.line([[xe,y,0],[xe,y,1.9]],HEAT(.6),a*.8)}}
+  v.label([-1,-2,-.3],'RANGE LOW',.75);v.label([1,-2,-.3],'RANGE HIGH',.75)}}}
+
+/* ---------- 4. fluid + sluice ---------- */
+function Fluid(v){const N=1500,XL=-3.2,XR=4.2,p=[],vel=[];let t=0,gate=0,pr=0;const R=x=>x<0?1:x<1.3?.36+.64*.5*(1+Math.cos(Math.PI*x/1.3)):.36+.09*(x-1.3);
+ return{info:()=>`pressure index ${fmt(pr)}  ·  gate aperture ${fmt(100*gate,0)}%<br>inventory-pressure (live) ${fmt(S.press)} · vol ratio ${fmt(S.vr)} · CVD ${S.cvd>=0?'+':''}${fmt(S.cvd)}`,
+ step(dt){t+=dt;v.cam.az=-.4+.3*Math.sin(t/12);v.cam.el=.3;v.cam.dist=11;v.cam.t=[.5,0,0];gate=sm(S.vr,.95,1.5);
+  const nin=Math.round(4+8*S.press);for(let i=0;i<nin&&p.length<N;i++){const a=Math.random()*TAU,r=Math.sqrt(Math.random())*.95;p.push([XL+.05+Math.random()*.3,r*Math.cos(a),r*Math.sin(a)]);vel.push([.8,0,0])}
+  const B=40,rho=new Float32Array(B);for(const q of p)rho[clamp(Math.floor((q[0]-XL)/(XR-XL)*B),0,B-1)]++;const sr=rho.map((_,i)=>(rho[Math.max(0,i-1)]+rho[i]*2+rho[Math.min(B-1,i+1)])/4),mx=Math.max(...sr)+1e-6;pr=sr.slice(0,22).reduce((a,b)=>Math.max(a,b),0)/60;
+  for(let k=0;k<p.length;k++){const q=p[k],w=vel[k],b=clamp(Math.floor((q[0]-XL)/(XR-XL)*B),0,B-1),g=(sr[Math.min(B-1,b+1)]-sr[Math.max(0,b-1)])/2,rn=sr[b]/mx;
+   const F=-g*.5+gate*(q[0]<1.8?9*rn:2.2),dr=q[0]<1.3?2.6*(1-.75*gate):.25;w[0]+=(F-dr*w[0])*.035;w[1]+=(-dr*w[1])*.035+.25*Math.sqrt(.035)*gauss();w[2]+=(-dr*w[2])*.035+.25*Math.sqrt(.035)*gauss();
+   q[0]+=w[0]*.035;q[1]+=w[1]*.035;q[2]+=w[2]*.035;if(q[0]>-.04&&q[0]<.06&&Math.hypot(q[1],q[2])>.36+.64*gate){q[0]=-.04;w[0]*=-.2}if(gate<.03&&q[0]>-.04){q[0]=-.04;w[0]=-Math.abs(w[0])*.3}
+   const rp=Math.hypot(q[1],q[2]),Rl=R(q[0]);if(rp>Rl){q[1]*=Rl/rp*.995;q[2]*=Rl/rp*.995;w[1]*=-.2;w[2]*=-.2}}
+  for(let k=p.length-1;k>=0;k--)if(p[k][0]>XR-.2){p.splice(k,1);vel.splice(k,1)}},
+ draw(){v.begin(.25);for(let k=0;k<p.length;k++){const sp=clamp(vel[k][0]/3,0,1),c=HEAT(.2+.5*clamp(pr,0,1)+.45*Math.pow(sp,.7));v.dot(p[k],c,3,.8)}
+  for(let a=0;a<TAU;a+=TAU/8){const l=[];for(let x=XL;x<XR-.2;x+=.2)l.push([x,R(x)*Math.cos(a),R(x)*Math.sin(a)]);v.line(l,ICE(.45),.25)}
+  for(let x=XL;x<XR-.2;x+=.5){const l=[];for(let a=0;a<=TAU+.1;a+=.4)l.push([x,R(x)*Math.cos(a),R(x)*Math.sin(a)]);v.line(l,HEAT(.35),.2)}
+  if(gate<.98){const l=[];for(let a=0;a<=TAU+.1;a+=.3)l.push([0,Math.cos(a),Math.sin(a)]);v.line(l,GOLD(.85),(1-gate)*.9,1.6)}
+  v.label([XL+.8,0,-1.4],'INVENTORY',.75);v.label([0,0,-1.4],'GATE',.75);v.label([3.3,0,-1.1],'TREND JET',.75)}}}
+
+/* ---------- 5. Hurst filaments ---------- */
+function Hurst(v){const P=150,Ln=44,pos=[],inc=[],buf=[];for(let i=0;i<P;i++){pos.push([0,0,0]);inc.push([0,0,0]);buf.push([])}let t=0,Hm=.5,zs=[];
+ return{info:()=>`live H = ${fmt(S.H)} · measured on ensemble ${fmt(Hm)}<br>φ = ${fmt(Math.pow(2,2*S.H-1)-1)} · Parkinson vol ratio ${fmt(S.vr)} · bias ${S.bias>0?'up':'down'}`,
+ step(dt){t+=dt;const phi=clamp(Math.pow(2,2*S.H-1)-1,-.3,.45),br=sm(S.H,.5,.7),sig=.026*(1+.9*clamp(S.vr-1,0,1.2)),zc=pos.reduce((a,q)=>a+q[2],0)/P;
+  v.cam.az=-.6+t*.05;v.cam.el=.3;v.cam.dist=8+clamp(Math.abs(zc)*2,0,6);v.cam.t=[0,0,zc*.8];
+  for(let it=0;it<2;it++){for(let i=0;i<P;i++){for(let d=0;d<3;d++){inc[i][d]=phi*inc[i][d]+sig*gauss();if(d==2)inc[i][2]+=.03*br*S.bias;pos[i][d]+=inc[i][d]-(d<2?.05*(1-br)*pos[i][d]:0)-(d==2?.05*(1-br)*pos[i][d]:0)}
+   buf[i].unshift(pos[i].slice());if(buf[i].length>Ln)buf[i].pop()}zs.push(pos.map(q=>q[2]));if(zs.length>90)zs.shift()}
+  if(zs.length>40){const lags=[1,2,3,4,6,8,12],lx=lags.map(Math.log),ly=lags.map(k=>{let s=0,c=0;for(let a=k;a<zs.length;a++)for(let i=0;i<P;i+=5){const d=zs[a][i]-zs[a-k][i];s+=d*d;c++}return Math.log(Math.sqrt(s/c)+1e-9)});
+   const mx=lx.reduce((a,b)=>a+b)/7,my=ly.reduce((a,b)=>a+b)/7;let nu=0,de=0;lx.forEach((x,i)=>{nu+=(x-mx)*(ly[i]-my);de+=(x-mx)**2});Hm=clamp(nu/de,.05,.95)}this.br=br},
+ draw(){v.begin(.3);const br=this.br||0;for(let i=0;i<P;i++){const b=buf[i];if(b.length<3)continue;for(let s=0;s<4;s++){const seg=b.slice(Math.floor(s*b.length/4),Math.ceil((s+1)*b.length/4)+1),f=1-s/4;v.line(seg,mix(ICE(.3+.6*f),HEAT(.3+.7*f),br),.12+.55*f*f,1)}v.dot(pos[i],[255,245,225],2.2,.9)}
+  const th=[];for(let a=0;a<=TAU+.1;a+=.2)th.push(a);for(const z of[-1,1])v.line(th.map(a=>[1.4*Math.cos(a),1.4*Math.sin(a),z]),[140,180,255],.3);v.label([1.7,0,-1],'RANGE LOW',.7);v.label([1.7,0,1],'RANGE HIGH',.7)}}}
+
+/* ---------- regime panel ---------- */
+function spark(c,ser,mark){const d=devicePixelRatio||1,r=c.getBoundingClientRect();c.width=r.width*d;c.height=r.height*d;const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);if(!ser||!ser.length)return;
+ const lo=Math.min(...ser),hi=Math.max(...ser),f=(i,v)=>[i/(ser.length-1)*c.width*.97,c.height*(.9-.8*(v-lo)/(hi-lo+1e-9))];x.strokeStyle='#fff';x.lineWidth=1.4*d;x.beginPath();ser.forEach((v,i)=>{const p=f(i,v);i?x.lineTo(...p):x.moveTo(...p)});x.stroke();
+ const p=f(ser.length-1,ser[ser.length-1]);x.fillStyle='#fff';x.beginPath();x.arc(p[0],p[1],3*d,0,TAU);x.fill();x.font=`${12*d}px "Times New Roman",serif`;x.fillText(mark,6*d,14*d)}
+
+/* ---------- candles ---------- */
+function drawChart(M){const c=document.getElementById('chart'),d=devicePixelRatio||1,r=c.getBoundingClientRect();c.width=r.width*d;c.height=r.height*d;const x=c.getContext('2d'),W=c.width,H=c.height,o=M.ohlc,n=o.length,
+ lo=Math.min(...o.map(b=>b[3]),M.lo),hi=Math.max(...o.map(b=>b[2]),M.hi),pad=(hi-lo)*.06,y=p=>H*(1-(p-(lo-pad))/((hi-lo)+2*pad)),bw=(W-80*d)/n;x.clearRect(0,0,W,H);
+ x.fillStyle='rgba(255,196,80,.05)';x.fillRect(0,y(M.hi),W-70*d,y(M.lo)-y(M.hi));
+ o.forEach((b,i)=>{const up=b[4]>=b[1],col=up?'#0f7a53':'#a31f33',cx=i*bw+bw/2;x.strokeStyle=col;x.fillStyle=col;x.lineWidth=Math.max(1,bw*.12);x.beginPath();x.moveTo(cx,y(b[2]));x.lineTo(cx,y(b[3]));x.stroke();const t=y(Math.max(b[1],b[4])),h=Math.max(1,Math.abs(y(b[1])-y(b[4])));x.fillRect(cx-bw*.36,t,bw*.72,h)});
+ x.font=`${13*d}px "Times New Roman",Times,serif`;x.fillStyle='#fff';x.textAlign='right';
+ for(const[v,l,dash]of[[M.hi,'RANGE HIGH',[]],[M.lo,'RANGE LOW',[]],[M.poc,'POC',[3*d,5*d]]]){x.strokeStyle='rgba(255,255,255,.55)';x.setLineDash(dash.length?dash:[8*d,6*d]);x.lineWidth=d;x.beginPath();x.moveTo(0,y(v));x.lineTo(W-72*d,y(v));x.stroke();x.fillText(fmt(v,1),W-6*d,y(v)-3*d);x.textAlign='left';x.fillText(l,6*d,y(v)-4*d);x.textAlign='right'}
+ x.setLineDash([]);x.strokeStyle='#ffd37a';x.lineWidth=1.4*d;x.beginPath();x.moveTo(0,y(M.price));x.lineTo(W-72*d,y(M.price));x.stroke();x.fillStyle='#ffd37a';x.fillText(fmt(M.price,1),W-6*d,y(M.price)-3*d)}
+
+/* ---------- boot ---------- */
+const panels=[['Potential well · Kramers escape','Langevin dynamics on the Boltzmann-inverted volume profile',Well],['Entropy · phase transition','Permutation entropy drives lattice temperature; expansion melts it',Lattice],['Diffusion · boundary stress','Live price is the heat source; wall leak rises as price tests an edge',Diffusion],
+ ['Fluid · pressure & sluice gate','Inventory pressure fills the chamber; vol expansion opens the gate',Fluid],['Hurst · fractal regime','Filament persistence follows the live Hurst exponent',Hurst]];
+const grid=document.getElementById('grid'),scenes=[];
+panels.forEach(([t,s,F],k)=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<h2>${'I II III IV V'.split(' ')[k]}.  ${t}</h2><p class="sub">${s}</p><canvas></canvas><div class="ro"></div>`;grid.appendChild(d);const v=new View(d.querySelector('canvas')),sc=F(v);scenes.push({v,sc,ro:d.querySelector('.ro')})});
+const rp=document.createElement('div');rp.className='card';rp.innerHTML=`<h2>Regime read-out</h2><p class="sub">Live quantitative state of the structure</p><div class="verdict" id="vd">—</div><div class="tbl" id="tb"></div><canvas class="spark" id="s1"></canvas><canvas class="spark" id="s2"></canvas><section class="insight" aria-live="polite"><div class="insight-head"><h3>Live plain-language agent</h3><span class="side-badge" id="agent-side">ANALYSING</span></div><p id="agent-summary">Waiting for the first live analytics update.</p><ul id="agent-details"></ul><p class="caveat">Rule-based explanation of delayed market data, not a prediction or trading advice. The buy/sell lean uses candle-direction volume and range position; it is not exchange-reported order flow.</p></section>`;grid.appendChild(rp);
+let iv='5m',next=0;const seg=document.getElementById('seg');['1m','5m','15m','30m'].forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{iv=k;load()};seg.appendChild(b)});
+function ease(){if(!L)return;const a=.04,k={pos:L.pos,cvd:L.cvd,comp:L.compression,vr:L.vol_ratio,pe:L.entropy,pctE:L.entropy_pct,H:L.hurst,press:L.pressure,bias:L.bias,kU:L.kramers_up,kD:L.kramers_dn};for(const q in k)S[q]=S[q]==null?k[q]:S[q]+(k[q]-S[q])*a;if(S.pctE==null)S.pctE=k.pctE}
+function updateAgent(M){
+ const cvdScore=clamp(M.cvd,-1,1),locationScore=clamp((M.pos-.5)*2,-1,1),score=.7*cvdScore+.3*locationScore;
+ const side=score>=.14?'BUYERS LEANING':score<=-.14?'SELLERS LEANING':'MIXED / NO CLEAR SIDE';
+ const sideEl=document.getElementById('agent-side');sideEl.textContent=side;sideEl.style.color=score>=.14?'#38c48f':score<=-.14?'#e0566a':'#fff';
+ const place=M.pos>=.75?'upper quarter':M.pos<=.25?'lower quarter':'middle half';
+ const poc=M.price>M.poc?'above':M.price<M.poc?'below':'at';
+ const volState=M.vol_ratio>1.2?'recent volatility is expanding':M.vol_ratio<.95?'recent volatility is quieter than the range average':'recent volatility is near its range average';
+ const persistence=M.hurst>.58?'more persistent moves':M.hurst<.42?'weaker persistence and more tendency to rotate':'no strong persistence signal';
+ const entropy=M.entropy>=.9?'highly noisy':M.entropy<=.7?'more orderly':'moderately noisy';
+ const barrier=M.kramers_up>M.kramers_dn?'the upper edge has the larger volume-profile barrier':M.kramers_dn>M.kramers_up?'the lower edge has the larger volume-profile barrier':'volume-profile barriers are similar on both sides';
+ document.getElementById('agent-summary').textContent=`${side.toLowerCase()} based on a combined read of candle-volume pressure and where price sits in the range. Treat this as a lean, not a certainty.`;
+ const details=[
+  `Range: price is in the ${place} at ${fmt(100*M.pos,0)}%, ${poc} the point of control (POC) at ${fmt(M.poc)}.`,
+  `Buy/sell pressure: 96-bar CVD is ${(M.cvd>=0?'+' : '')+fmt(M.cvd,3)}; this is a candle-direction × volume estimate, not true bid/ask trade flow.`,
+  `Market state: ${M.regime.toLowerCase()}; Hurst ${fmt(M.hurst,2)} suggests ${persistence}. Entropy ${fmt(M.entropy,2)} is ${entropy} (recent percentile ${fmt(100*M.entropy_pct,0)}%).`,
+  `Volatility and activity: ${volState} (24-bar/range ratio ${fmt(M.vol_ratio,2)}); 24-bar Garman–Klass volatility is ${fmt(100*M.gk,3)}%, and inventory pressure is ${fmt(M.pressure,2)}.`,
+  `Range mechanics: Kramers indices up/down are ${fmt(M.kramers_up,2)} / ${fmt(M.kramers_dn,2)}; ${barrier}. Diffusion estimate is ${M.D_norm.toExponential(2)} in range units.`
+ ];
+ document.getElementById('agent-details').replaceChildren(...details.map(text=>{const li=document.createElement('li');li.textContent=text;return li}));
+}
+async function load(){try{const r=await fetch('/api/analytics?interval='+iv);if(!r.ok)throw Error(`Analytics request failed (${r.status})`);L=await r.json();next=Date.now()+45000;
+ [...seg.children].forEach(b=>b.classList.toggle('on',b.textContent==iv));const ch=L.price-L.prev;document.getElementById('px').textContent=fmt(L.price);const c=document.getElementById('chg');c.textContent=(ch>=0?'+':'')+fmt(ch)+'  ('+fmt(100*ch/L.prev)+'%)';c.style.color=ch>=0?'#38c48f':'#e0566a';
+ document.getElementById('src').textContent=L.source+' · '+L.interval+' · '+L.n_bars+' bars';document.getElementById('upd').textContent=L.server_time;
+ const b=document.getElementById('ban');b.style.display=/synthetic/.test(L.source)?'block':'none';b.textContent='Yahoo Finance was unreachable from this server — showing a synthetic gold series so the models stay live.';
+ document.getElementById('rngline').textContent=`${L.n_range}-bar range  ${fmt(L.lo)} – ${fmt(L.hi)}  ·  POC ${fmt(L.poc)}  ·  price at ${fmt(100*L.pos,0)}% of range`;drawChart(L);
+ const vd=document.getElementById('vd');vd.textContent=L.regime;vd.style.color=L.regime=='EXPANSION'?'#ffd37a':L.regime=='COMPRESSION'?'#7fd0ff':'#fff';
+ const rows=[['Hurst exponent H',fmt(L.hurst)],['Permutation entropy',fmt(L.entropy,3)+'  (pct '+fmt(100*L.entropy_pct,0)+')'],['Parkinson vol ratio (24 / range)',fmt(L.vol_ratio)],['Garman–Klass vol (24 bars)',fmt(100*L.gk,3)+'%'],['Kramers index ↑ / ↓',fmt(L.kramers_up)+' / '+fmt(L.kramers_dn)],['Inventory pressure',fmt(L.pressure)],['CVD bias (96 bars)',(L.cvd>=0?'+':'')+fmt(L.cvd)],['Diffusion coeff (range units)',L.D_norm.toExponential(2)]];
+ document.getElementById('tb').innerHTML=rows.map(r=>`<span>${r[0]}</span><span>${r[1]}</span>`).join('');spark(document.getElementById('s1'),L.entropy_series,'rolling permutation entropy');spark(document.getElementById('s2'),L.hurst_series,'rolling Hurst exponent');updateAgent(L);
+ }catch(e){console.error(e);document.getElementById('agent-side').textContent='UPDATE FAILED';document.getElementById('agent-side').style.color='#e0566a';document.getElementById('agent-summary').textContent=`Couldn't refresh the live analysis for ${iv}. Check the dashboard connection and try again.`}}
+let last=performance.now();function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;ease();scenes.forEach(s=>{s.sc.step(dt);s.sc.draw();s.v.x.globalAlpha=1;s.v.x.globalCompositeOperation='source-over'});document.getElementById('cnt').textContent=L?'next scan in '+Math.max(0,Math.round((next-Date.now())/1000))+'s':'';
+ if(L&&Math.floor(now/500)!=Math.floor((now-16)/500))scenes.forEach(s=>s.ro.innerHTML=s.sc.info());if(L&&Date.now()>next){next=Date.now()+45000;load()}requestAnimationFrame(loop)}
+addEventListener('resize',()=>{scenes.forEach(s=>s.v.fit());if(L)drawChart(L)});load().then(()=>requestAnimationFrame(loop));
+</script></body></html>
