@@ -3,6 +3,36 @@
 Five physics frameworks mapped onto gold futures (GC=F) accumulation / distribution, each as a 20 s 3D MP4,
 plus a live dashboard that re-runs all five on the latest yfinance prices.
 
+## The five models
+| # | Model | Idea |
+|---|-------|------|
+| I | Potential well · Kramers escape | Price as a particle in a well shaped by the volume profile |
+| II | Entropy · phase transition | Order builds in the range and is released at breakout |
+| III | Diffusion · boundary stress | Liquidity spreads while resting orders act as walls |
+| IV | Fluid · sluice gate | Inventory pressure builds behind a gate, then releases |
+| V | Hurst · fractal regime | Mean-reverting to trending persistence flip |
+
+## What it measures (from live 5m candles)
+Range and position, volume profile / POC, Parkinson and Garman-Klass volatility, candle-based CVD, permutation entropy, Hurst exponent, and a rule-based regime label (compression / balanced / expansion).
+
+## Quick start
+```bash
+pip install -r requirements.txt
+python run_all.py          # render the five 20 s MP4s on live data
+python -m dashboard.app    # live dashboard at localhost:8050
+```
+
+## Limits (please read)
+- The physics is a **visual analogy**, not a claim that markets behave like fluids or particles.
+- Video "breakouts" are illustrative sequences, not predictions. The dashboard describes the current state and does not forecast.
+- CVD is a candle-based proxy, not true bid/ask delta. Pressure weights and regime thresholds are heuristics, not backtested.
+- Yahoo data is delayed. Not financial advice.
+
+## Notes
+- Text in all visuals is Times New Roman, white (falls back to Liberation Serif if TNR isn't installed). Override with env `TNR_PATH`.
+- Yahoo limits: 1m ≤ 7 days, 5m/15m/30m ≤ 60 days; GC=F is delayed ~10 min. Metrics are descriptive analytics, not trading signals.
+
+
 | # | Model | File | Video |
 |---|-------|------|-------|
 | I   | Potential well · Langevin · Kramers escape | `models/m1_potential_well.py`   | `videos/01_potential_well_kramers.mp4` |
@@ -92,32 +122,3 @@ The math has two layers: the statistics measured on real gold candles, and the e
 - The physics is analogy. Real price does not obey these equations, and the dashboard describes state without forecasting.
 
 __________________________________________________
-
-## The five models
-| # | Model | Idea |
-|---|-------|------|
-| I | Potential well · Kramers escape | Price as a particle in a well shaped by the volume profile |
-| II | Entropy · phase transition | Order builds in the range and is released at breakout |
-| III | Diffusion · boundary stress | Liquidity spreads while resting orders act as walls |
-| IV | Fluid · sluice gate | Inventory pressure builds behind a gate, then releases |
-| V | Hurst · fractal regime | Mean-reverting to trending persistence flip |
-
-## What it measures (from live 5m candles)
-Range and position, volume profile / POC, Parkinson and Garman-Klass volatility, candle-based CVD, permutation entropy, Hurst exponent, and a rule-based regime label (compression / balanced / expansion).
-
-## Quick start
-```bash
-pip install -r requirements.txt
-python run_all.py          # render the five 20 s MP4s on live data
-python -m dashboard.app    # live dashboard at localhost:8050
-```
-
-## Limits (please read)
-- The physics is a **visual analogy**, not a claim that markets behave like fluids or particles.
-- Video "breakouts" are illustrative sequences, not predictions. The dashboard describes the current state and does not forecast.
-- CVD is a candle-based proxy, not true bid/ask delta. Pressure weights and regime thresholds are heuristics, not backtested.
-- Yahoo data is delayed. Not financial advice.
-
-## Notes
-- Text in all visuals is Times New Roman, white (falls back to Liberation Serif if TNR isn't installed). Override with env `TNR_PATH`.
-- Yahoo limits: 1m ≤ 7 days, 5m/15m/30m ≤ 60 days; GC=F is delayed ~10 min. Metrics are descriptive analytics, not trading signals.
